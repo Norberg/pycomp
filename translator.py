@@ -10,20 +10,21 @@ define i32 @main() nounwind {
 entry:
 		""")
 		self.allocated_objects = dict()
+		self.allocated_temp = 0
 	def visit_BinOp(self, node):
-		self.output.write(self.get_op(node.op))
-		self.visit(node.left)
-		self.output.write(',')
-		self.visit(node.right)
-		self.output.write('\n')
+		op = self.get_op(node.op)
+		left = self.visit(node.left)
+		right = self.visit(node.right)
+		return "{} {},{}".format(op, left, right)
 	def visit_Num(self, node):
-		self.output.write(str(node.n))
+		return str(node.n)
 	def visit_Name(self, node):
-		self.output.write(self.current_variable(node))
+		return self.generate_variable(node)
 	def visit_Assign(self, node):
 		self.output.write(";[assign {}]\n".format(ast.dump(node)))
-		self.generate_variable(node.targets[0])
-		ast.NodeVisitor.visit(self, node.value)
+		operation = ast.NodeVisitor.visit(self, node.value)
+		var = self.generate_variable(node.targets[0])
+		self.output.write("{} {}\n".format(var, operation))
 		self.store_variable(node.targets[0])
 	def visit_Expr(self, node):
 		ast.NodeVisitor.generic_visit(self, node)
@@ -38,25 +39,27 @@ entry:
 		ast.NodeVisitor.generic_visit(self, node)
 	def get_op(self, op):
 		if type(op) is _ast.Add:
-			return " add i32 "
+			return "add i32"
 		elif type(op) is _ast.Sub:
-			return " sub i32 "
+			return "sub i32 "
 		elif type(op) is _ast.Div:
-			return " sdiv i32 "
+			return "sdiv i32 "
 		elif type(op) is _ast.Mult:
-			return " mul i32 "
+			return "mul i32 "
 		else:
 			raise Exception("unsupported operator " +str(type(op)))
 	def generate_variable(self, node):
 		if node.id not in self.allocated_objects:
 			self.allocated_objects[node.id] = 0
 			self.output.write("%{} = alloca i32\n".format(node.id))
-			self.output.write("{} = ".format(self.current_variable(node)))
-			return
+			return "{} = ".format(self.current_variable(node))
 		if type(node.ctx) is _ast.Load:
 			self.load_variable(node)
+			return "{}".format(self.current_variable(node))
 		elif type (node.ctx) is _ast.Store:
-			self.store_variable(node)
+			self.allocated_objects[node.id] += 1
+			return "{} = ".format(self.current_variable(node))
+			##self.store_variable(node)
 			
 	def load_variable(self, node):
 		self.allocated_objects[node.id] += 1
