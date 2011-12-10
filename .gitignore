@@ -1,0 +1,6 @@
+*.out
+*.ll
+*.s
+*.bc
+*.pyc
+debug/*
