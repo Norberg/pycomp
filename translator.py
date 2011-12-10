@@ -45,8 +45,7 @@ entry:
 	def visit_Call(self, node):
 		# atm we only support one argument to functions
 		if type(node.args[0]) in self.constant:
-			self.load_variable(node.args[0])
-			arg1 = self.current_variable(node.args[0])
+			arg1 = self.visit(node.args[0])
 		else:
 			arg1 = self.sub_expression(node.args[0])
 		if node.func.id == "print":
