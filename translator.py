@@ -17,18 +17,12 @@ entry:
 		if type(node.left) in self.constant:
 			left = self.visit(node.left)
 		else:
-			operation = self.visit(node.left)
-			var = self.create_temp()
-			self.output.write("{} = {}\n".format(var, operation))
-			left = var
+			left = self.sub_expression(node.left)
 			
 		if type(node.right) in self.constant:
 			right = self.visit(node.right)
 		else:
-			operation = self.visit(node.right)
-			var = self.create_temp()
-			self.output.write("{} = {}\n".format(var, operation))
-			right = var
+			right = self.sub_expression(node.right)
 			
 		return "{} {},{}".format(op, left, right)
 	def visit_Num(self, node):
@@ -85,9 +79,12 @@ entry:
 		self.output.write("store i32 %{}.{},i32* %{}\n".format(node.id, self.allocated_objects[node.id], node.id))
 	def create_temp(self):
 		self.allocated_temp += 1
-		return self.current_temp()
-	def current_temp(self):
 		return "%{}".format(self.allocated_temp)
+	def sub_expression(self, node):
+			operation = self.visit(node)
+			var = self.create_temp()
+			self.output.write("{} = {}\n".format(var, operation))
+			return var
 	def close(self):
 		self.output.write("""ret i32 0
 }		\n""")
