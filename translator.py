@@ -10,11 +10,26 @@ define i32 @main() nounwind {
 entry:
 		""")
 		self.allocated_objects = dict()
-		self.allocated_temp = 0
+		self.allocated_temp = -1 
+		self.constant = (_ast.Num,_ast.Name)
 	def visit_BinOp(self, node):
 		op = self.get_op(node.op)
-		left = self.visit(node.left)
-		right = self.visit(node.right)
+		if type(node.left) in self.constant:
+			left = self.visit(node.left)
+		else:
+			operation = self.visit(node.left)
+			var = self.create_temp()
+			self.output.write("{} = {}\n".format(var, operation))
+			left = var
+			
+		if type(node.right) in self.constant:
+			right = self.visit(node.right)
+		else:
+			operation = self.visit(node.right)
+			var = self.create_temp()
+			self.output.write("{} = {}\n".format(var, operation))
+			right = var
+			
 		return "{} {},{}".format(op, left, right)
 	def visit_Num(self, node):
 		return str(node.n)
@@ -32,7 +47,7 @@ entry:
 		if node.func.id == "print":
 			self.generate_print(node)
 		else:
-			self.output.write("call i32 @{} (%{})\n".format(node.func.id, node.args[0].id))
+			self.output.write("{} = call i32 @{} (%{})\n".format(self.create_temp(), node.func.id, node.args[0].id))
 	def generic_visit(self, node):
 		if type(node) is not _ast.Module:
 			self.output.write("[{}]".format(ast.dump(node)))
@@ -68,12 +83,16 @@ entry:
 		return "%{}.{}".format(node.id, self.allocated_objects[node.id])
 	def store_variable(self, node):
 		self.output.write("store i32 %{}.{},i32* %{}\n".format(node.id, self.allocated_objects[node.id], node.id))
-
+	def create_temp(self):
+		self.allocated_temp += 1
+		return self.current_temp()
+	def current_temp(self):
+		return "%{}".format(self.allocated_temp)
 	def close(self):
 		self.output.write("""ret i32 0
-}		""")
+}		\n""")
 		self.output.close()
 	def generate_print(self, node):
 		self.load_variable(node.args[0])
-		self.output.write("call i32 (i8*, ...)* @printf(i8* noalias getelementptr inbounds ([4 x i8]* @.print_int, i64 0, i64 0), i32 {}) nounwind \n".format(self.current_variable(node.args[0])))
+		self.output.write("{} = call i32 (i8*, ...)* @printf(i8* noalias getelementptr inbounds ([4 x i8]* @.print_int, i64 0, i64 0), i32 {}) nounwind \n".format(self.create_temp(),self.current_variable(node.args[0])))
 
