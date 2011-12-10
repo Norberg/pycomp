@@ -1,4 +1,7 @@
 import ast, _ast
+import Ast
+from constants import datatype
+
 
 class MyVisitor(ast.NodeVisitor):
 	def __init__(self, outputfile):
@@ -24,27 +27,33 @@ entry:
 		else:
 			right = self.sub_expression(node.right)
 			
-		return "{} {},{}".format(op, left, right)
+		return "{} {},{}".format(op, left.id, right.id)
 	def visit_Num(self, node):
-		return str(node.n)
+		num =  Ast.id()
+		num.id = node.n
+		num.type = datatype.i32
+		return num
 	def visit_Name(self, node):
 		return self.generate_variable(node)
 	def visit_Assign(self, node):
-		self.output.write(";[assign {}]\n".format(ast.dump(node)))
 		operation = ast.NodeVisitor.visit(self, node.value)
 		var = self.generate_variable(node.targets[0])
-		self.output.write("{} {}\n".format(var, operation))
+		self.output.write("{} = {}\n".format(var.id, operation))
 		self.store_variable(node.targets[0])
 	def visit_Expr(self, node):
 		ast.NodeVisitor.generic_visit(self, node)
 	def visit_Call(self, node):
-		if node.func.id == "print":
-			self.generate_print(node)
+		# atm we only support one argument to functions
+		if type(node.args[0]) in self.constant:
+			self.load_variable(node.args[0])
+			arg1 = self.current_variable(node.args[0])
 		else:
-			self.output.write("{} = call i32 @{} (%{})\n".format(self.create_temp(), node.func.id, node.args[0].id))
+			arg1 = self.sub_expression(node.args[0])
+		if node.func.id == "print":
+			self.generate_print(arg1)
+		else:
+			self.output.write("{} = call i32 @{} (%{})\n".format(self.create_temp(datatype.i32).id, node.func.id, arg1.id))
 	def generic_visit(self, node):
-		if type(node) is not _ast.Module:
-			self.output.write("[{}]".format(ast.dump(node)))
 		ast.NodeVisitor.generic_visit(self, node)
 	def get_op(self, op):
 		if type(op) is _ast.Add:
@@ -61,35 +70,39 @@ entry:
 		if node.id not in self.allocated_objects:
 			self.allocated_objects[node.id] = 0
 			self.output.write("%{} = alloca i32\n".format(node.id))
-			return "{} = ".format(self.current_variable(node))
+			return self.current_variable(node)
 		if type(node.ctx) is _ast.Load:
 			self.load_variable(node)
-			return "{}".format(self.current_variable(node))
+			return self.current_variable(node)
 		elif type (node.ctx) is _ast.Store:
 			self.allocated_objects[node.id] += 1
-			return "{} = ".format(self.current_variable(node))
-			##self.store_variable(node)
+			return self.current_variable(node)
 			
 	def load_variable(self, node):
 		self.allocated_objects[node.id] += 1
 		self.output.write("%{}.{} = load i32* %{}\n".format(node.id, self.allocated_objects[node.id], node.id))
 	def current_variable(self, node):
-		return "%{}.{}".format(node.id, self.allocated_objects[node.id])
+		variable = Ast.id()
+		variable.id =  "%{}.{}".format(node.id, self.allocated_objects[node.id])
+		variable.type = datatype.i32
+		return variable
 	def store_variable(self, node):
 		self.output.write("store i32 %{}.{},i32* %{}\n".format(node.id, self.allocated_objects[node.id], node.id))
-	def create_temp(self):
+	def create_temp(self, type):
 		self.allocated_temp += 1
-		return "%{}".format(self.allocated_temp)
+		temp = Ast.temp()
+		temp.id = "%{}".format(self.allocated_temp)
+		temp.type = type
+		return temp
 	def sub_expression(self, node):
-			operation = self.visit(node)
-			var = self.create_temp()
-			self.output.write("{} = {}\n".format(var, operation))
-			return var
+		operation = self.visit(node)
+		var = self.create_temp(datatype.i32)
+		self.output.write("{} = {}\n".format(var.id, operation))
+		return var
 	def close(self):
 		self.output.write("""ret i32 0
 }		\n""")
 		self.output.close()
-	def generate_print(self, node):
-		self.load_variable(node.args[0])
-		self.output.write("{} = call i32 (i8*, ...)* @printf(i8* noalias getelementptr inbounds ([4 x i8]* @.print_int, i64 0, i64 0), i32 {}) nounwind \n".format(self.create_temp(),self.current_variable(node.args[0])))
+	def generate_print(self, arg1):
+		self.output.write("{} = call i32 (i8*, ...)* @printf(i8* noalias getelementptr inbounds ([4 x i8]* @.print_int, i64 0, i64 0), i32 {}) nounwind \n".format(self.create_temp(datatype.i32).id,arg1.id))
 
