@@ -59,10 +59,12 @@ entry:
 			return "add i32"
 		elif type(op) is _ast.Sub:
 			return "sub i32 "
-		elif type(op) is _ast.Div:
+		elif type(op) is _ast.FloorDiv:
 			return "sdiv i32 "
 		elif type(op) is _ast.Mult:
 			return "mul i32 "
+		elif type(op) is _ast.Div:
+			return "sdiv i32 "
 		else:
 			raise Exception("unsupported operator " +str(type(op)))
 	def generate_variable(self, node):
