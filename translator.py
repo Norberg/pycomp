@@ -36,14 +36,14 @@ entry:
 		return num
 
 	def visit_Name(self, node):
-		return self.generate_variable(node)
+		return self.generate_variable(node, datatype.i32) #TODO: fix datatype
 
 	def visit_Assign(self, node):
 		operation = ast.NodeVisitor.visit(self, node.value)
-		var = self.generate_variable(node.targets[0])
+		var = self.generate_variable(node.targets[0], operation.type)
 		operation.assign = var.id
 		self.output.write(str(operation))
-		self.store_variable(node.targets[0])
+		self.store_variable(node.targets[0], operation.type)
 
 	def visit_Expr(self, node):
 		ast.NodeVisitor.generic_visit(self, node)
@@ -103,33 +103,32 @@ entry:
 		elif type(value) is float:
 			return datatype.double
 		else:
-			raise Exception("unsupported datatype: {} is {}".format(str(var), type(var)))
+			raise Exception("unsupported datatype: {} is {}".format(str(value), type(value)))
 	
-	def generate_variable(self, node):
+	def generate_variable(self, node, datatype):
 		if node.id not in self.allocated_objects:
 			self.allocated_objects[node.id] = 0
 			self.output.write("%{} = alloca i32\n".format(node.id))
-			return self.current_variable(node)
+			return self.current_variable(node, datatype)
 		if type(node.ctx) is _ast.Load:
 			self.load_variable(node)
-			return self.current_variable(node)
+			return self.current_variable(node, datatype)
 		elif type (node.ctx) is _ast.Store:
 			self.allocated_objects[node.id] += 1
-			return self.current_variable(node)
+			return self.current_variable(node, datatype)
 			
 	def load_variable(self, node):
 		self.allocated_objects[node.id] += 1
 		self.output.write("%{}.{} = load i32* %{}\n".format(node.id, self.allocated_objects[node.id], node.id))
 
-	def current_variable(self, node):
+	def current_variable(self, node,datatype):
 		variable = Ast.id()
 		variable.id =  "%{}.{}".format(node.id, self.allocated_objects[node.id])
-		variable.type = datatype.i32
+		variable.type = datatype
 		return variable
 
-	def store_variable(self, node):
-		print (type(node))
-		self.output.write("store i32 %{}.{},i32* %{}\n".format(node.id, self.allocated_objects[node.id], node.id))
+	def store_variable(self, var, type):
+		self.output.write("store {0} %{1}.{2},{0}* %{3}\n".format(type,var.id, self.allocated_objects[var.id], var.id))
 
 	def create_temp(self, type):
 		self.allocated_temp += 1
